@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Home - AI Bridge{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome to AI Bridge</h1>
+    <p class="text-lg text-gray-600 mb-8">
+        Your central hub for interacting with AI models and monitoring your application.
+    </p>
+    <div class="space-x-4">
+        <a href="/chat" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full">
+            Go to Chat
+        </a>
+        <a href="/logs" class="bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-full">
+            View Logs
+        </a>
+    </div>
+</div>
+{% endblock %} 

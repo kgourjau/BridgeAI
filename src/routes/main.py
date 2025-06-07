@@ -1,0 +1,141 @@
+import logging
+from flask import Blueprint, jsonify, render_template, request
+from src.services.openai_service import (
+    openai_chat_completion,
+    openai_list_models,
+    openai_chat_completion_for_chat,
+)
+from src.config import TARGET_API_BASE_URL
+import re
+
+main_blueprint = Blueprint("main", __name__)
+logger = logging.getLogger(__name__)
+chat_logger = logging.getLogger("chat_logger")
+
+
+def get_last_logs(num_lines=200):
+    """Get the last N lines from logs.txt"""
+    try:
+        with open("logs.txt", "r") as f:
+            lines = f.readlines()
+            return lines[-num_lines:] if len(lines) > num_lines else lines
+    except FileNotFoundError:
+        return ["No log file found."]
+    except Exception as e:
+        return [f"Error reading log file: {str(e)}"]
+
+
+def parse_chat_logs():
+    """Parse chat_logs.txt and return a list of structured log entries."""
+    log_entries = []
+    log_pattern = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (.*?): (.*)")
+    try:
+        with open("logs/chat_logs.txt", "r") as f:
+            for line in f:
+                match = log_pattern.match(line.strip())
+                if match:
+                    timestamp, source, message = match.groups()
+                    role = "user" if "user" in source.lower() else "assistant"
+                    log_entries.append({
+                        "timestamp": timestamp,
+                        "role": role,
+                        "source": source,
+                        "message": message
+                    })
+    except FileNotFoundError:
+        return [{"timestamp": "", "role": "system", "source": "System", "message": "Chat log file not found."}]
+    except Exception as e:
+        return [{"timestamp": "", "role": "system", "source": "System", "message": f"Error reading chat log file: {e}"}]
+
+    return log_entries
+
+
+@main_blueprint.route("/")
+def index():
+    """Renders the home page"""
+    return render_template("index.html")
+
+
+@main_blueprint.route("/openai/v1/chat/completions", methods=["GET", "POST"])
+def chat_completions():
+    """Handle OpenAI chat completions"""
+    try:
+        result = openai_chat_completion()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error in OpenAI chat completion: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_blueprint.route("/openai/v1/models", methods=["GET"])
+def list_models():
+    """Handle OpenAI models list"""
+    try:
+        result = openai_list_models()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error fetching OpenAI models: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_blueprint.route("/chat", methods=["GET"])
+def chat_page():
+    """Render the chat page"""
+    return render_template("chat.html")
+
+
+@main_blueprint.route("/chat/message", methods=["POST"])
+def chat_message():
+    """Handle chat messages from the user"""
+    try:
+        data = request.get_json()
+        user_message = data.get("message")
+        if not user_message:
+            return jsonify({"error": "Message is required"}), 400
+
+        chat_logger.info(f"user: {user_message}")
+
+        completion = openai_chat_completion_for_chat(user_message)
+        ai_message = completion['choices'][0]['message']['content']
+
+        ai_source = f"AI ({TARGET_API_BASE_URL}/chat/completions)"
+        chat_logger.info(f"{ai_source}: {ai_message}")
+
+        return jsonify({"message": ai_message})
+    except Exception as e:
+        logger.error(f"Error handling chat message: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_blueprint.route("/logs", methods=["GET"])
+def logs_page():
+    """Render the logs page"""
+    return render_template("logs.html")
+
+
+@main_blueprint.route("/api/logs", methods=["GET"])
+def get_logs():
+    """API endpoint to get log data"""
+    try:
+        logs = get_last_logs(200)
+        return jsonify({"logs": logs})
+    except Exception as e:
+        logger.error(f"Error fetching logs: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_blueprint.route("/chat-logs", methods=["GET"])
+def chat_logs_page():
+    """Render the chat logs visualization page"""
+    return render_template("chat_logs.html")
+
+
+@main_blueprint.route("/api/chat-logs", methods=["GET"])
+def get_chat_logs():
+    """API endpoint to get parsed chat log data"""
+    try:
+        logs = parse_chat_logs()
+        return jsonify({"logs": logs})
+    except Exception as e:
+        logger.error(f"Error fetching chat logs: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500 

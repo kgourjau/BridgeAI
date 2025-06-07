@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Application Logs - AI Bridge{% endblock %}
+
+{% block content %}
+<body class="bg-gray-900 text-gray-100">
+    <div class="container mx-auto p-4" x-data="logs()" x-init="init()" @destroy="destroy()">
+        <div class="bg-gray-800 rounded-lg shadow-lg">
+            <!-- Header -->
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold">Application Logs</h1>
+                    <p class="text-gray-400 text-sm">Last 200 lines</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- Auto-refresh toggle -->
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" x-model="autoRefresh" class="rounded">
+                        <span class="text-sm">Auto-refresh (5s)</span>
+                    </label>
+                    <!-- Refresh button -->
+                    <button @click="fetchLogs" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm">
+                        Refresh
+                    </button>
+                    <!-- Clear button -->
+                    <button @click="clearLogs" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm">
+                        Clear View
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter section -->
+            <div class="p-4 border-b border-gray-700">
+                <div class="flex items-center space-x-4">
+                    <input 
+                        type="text" 
+                        x-model="filter" 
+                        placeholder="Filter logs..." 
+                        class="bg-gray-700 text-gray-100 px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none flex-1"
+                    >
+                    <select x-model="logLevel" class="bg-gray-700 text-gray-100 px-3 py-2 rounded border border-gray-600">
+                        <option value="">All Levels</option>
+                        <option value="ERROR">ERROR</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="INFO">INFO</option>
+                        <option value="DEBUG">DEBUG</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Logs display -->
+            <div class="p-4">
+                <div 
+                    class="bg-gray-900 rounded border border-gray-700 h-96 overflow-y-auto font-mono text-sm"
+                    x-ref="logsContainer"
+                >
+                    <template x-for="(log, index) in filteredLogs" :key="index">
+                        <div 
+                            class="px-3 py-1 border-b border-gray-800 hover:bg-gray-800"
+                            :class="{
+                                'text-red-400': log.includes('ERROR'),
+                                'text-yellow-400': log.includes('WARNING'),
+                                'text-blue-400': log.includes('INFO'),
+                                'text-gray-400': log.includes('DEBUG')
+                            }"
+                            x-text="log.trim()"
+                        ></div>
+                    </template>
+                    <div x-show="filteredLogs.length === 0" class="p-4 text-center text-gray-500">
+                        No logs to display
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer with stats -->
+            <div class="p-4 border-t border-gray-700 text-sm text-gray-400">
+                <div class="flex justify-between">
+                    <span>Total logs: <span x-text="logs.length"></span></span>
+                    <span>Filtered: <span x-text="filteredLogs.length"></span></span>
+                    <span>Last updated: <span x-text="lastUpdated"></span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script>
+    function logs() {
+        return {
+            logs: [],
+            filter: '',
+            logLevel: '',
+            autoRefresh: false,
+            lastUpdated: 'Never',
+            refreshInterval: null,
+
+            init() {
+                this.fetchLogs();
+                this.$watch('autoRefresh', (value) => {
+                    if (value) {
+                        this.startAutoRefresh();
+                    } else {
+                        this.stopAutoRefresh();
+                    }
+                });
+            },
+
+            get filteredLogs() {
+                return this.logs.filter(log => {
+                    const matchesFilter = this.filter === '' || 
+                        log.toLowerCase().includes(this.filter.toLowerCase());
+                    const matchesLevel = this.logLevel === '' || 
+                        log.includes(this.logLevel);
+                    return matchesFilter && matchesLevel;
+                });
+            },
+
+            async fetchLogs() {
+                try {
+                    const response = await fetch('/api/logs');
+                    const data = await response.json();
+                    if (data.logs) {
+                        this.logs = data.logs;
+                        this.lastUpdated = new Date().toLocaleTimeString();
+                        this.$nextTick(() => {
+                            this.$refs.logsContainer.scrollTop = this.$refs.logsContainer.scrollHeight;
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error fetching logs:', error);
+                }
+            },
+
+            clearLogs() {
+                this.logs = [];
+                this.lastUpdated = 'Cleared';
+            },
+
+            startAutoRefresh() {
+                this.refreshInterval = setInterval(() => {
+                    this.fetchLogs();
+                }, 5000);
+            },
+
+            stopAutoRefresh() {
+                if (this.refreshInterval) {
+                    clearInterval(this.refreshInterval);
+                    this.refreshInterval = null;
+                }
+            },
+
+            destroy() {
+                this.stopAutoRefresh();
+            }
+        }
+    }
+</script>
+{% endblock %} 

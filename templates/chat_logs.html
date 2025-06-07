@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Chat Logs - AI Bridge{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-4xl mx-auto" x-data="chatLogs()">
+    <div class="bg-white rounded-lg shadow-lg">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h1 class="text-xl font-bold">Chat Log History</h1>
+            <button @click="fetchLogs" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm">
+                Refresh
+            </button>
+        </div>
+        <div class="p-4 h-[75vh] overflow-y-auto space-y-4" x-ref="chatbox">
+            <!-- Log Entries -->
+            <template x-for="(log, index) in logs" :key="index">
+                <div class="flex" :class="log.role === 'user' ? 'justify-end' : 'justify-start'">
+                    <div class="max-w-xl">
+                        <div class="px-4 py-2 rounded-lg" :class="log.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'">
+                            <p x-text="log.message"></p>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1 px-2" :class="log.role === 'user' ? 'text-right' : 'text-left'">
+                            <span x-text="log.source"></span> - <span x-text="new Date(log.timestamp.replace(',', '.')).toLocaleString()"></span>
+                        </div>
+                    </div>
+                </div>
+            </template>
+             <div x-show="logs.length === 0" class="p-4 text-center text-gray-500">
+                No chat logs to display
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function chatLogs() {
+        return {
+            logs: [],
+
+            init() {
+                this.fetchLogs();
+            },
+
+            async fetchLogs() {
+                try {
+                    const response = await fetch('/api/chat-logs');
+                    const data = await response.json();
+                    if (data.logs) {
+                        this.logs = data.logs;
+                    }
+                } catch (error) {
+                    console.error('Error fetching chat logs:', error);
+                    this.logs = [{
+                        role: 'system',
+                        source: 'System',
+                        message: 'Could not load chat logs.',
+                        timestamp: new Date().toISOString()
+                    }];
+                }
+            }
+        }
+    }
+</script>
+{% endblock %} 
