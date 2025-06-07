@@ -97,13 +97,13 @@ def logout():
 def chat_completions():
     """Handle OpenAI chat completions"""
     try:
-        if (len(request.json["messages"]) >= 2 and
-                request.json["messages"][1]["content"] == "Test prompt using gpt-3.5-turbo"):
-            chat_logger.info(f"user: {json.dumps(request.json["messages"])}")
+        if (len(request.json['messages']) >= 2 and
+                request.json['messages'][1]['content'] == "Test prompt using gpt-3.5-turbo"):
+            chat_logger.info(f"user: {json.dumps(request.json['messages'])}")
             result = openai_chat_completion()
         else:
-            chat_logger.info(f"user: {json.dumps(request.json["messages"])}")
-            completion = openai_chat_completion_for_chat(request.json["messages"][1]["content"])
+            chat_logger.info(f"user: {json.dumps(request.json['messages'])}")
+            completion = openai_chat_completion_for_chat(request.json['messages'][1]['content'])
             ai_message = completion['choices'][0]['message']['content']
 
             return jsonify({"message": completion})
