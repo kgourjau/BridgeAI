@@ -1,9 +1,13 @@
 from flask import Flask
 from flask_cors import CORS
 import logging
+import os
 from src.routes.main import main_blueprint
 
 def setup_logging():
+    # Ensure log directory exists
+    os.makedirs("logs", exist_ok=True)
+
     # Configure general logging
     logging.basicConfig(
         level=logging.INFO,
