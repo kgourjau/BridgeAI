@@ -1,22 +1,34 @@
 import logging
-from flask import Blueprint, jsonify, render_template, request
+import re
+from functools import wraps
+from flask import Blueprint, jsonify, render_template, request, url_for, redirect, flash, session, current_app
+
+from src.decorators import bearer_required
 from src.services.openai_service import (
     openai_chat_completion,
     openai_list_models,
     openai_chat_completion_for_chat,
 )
 from src.config import TARGET_API_BASE_URL
-import re
 
 main_blueprint = Blueprint("main", __name__)
 logger = logging.getLogger(__name__)
 chat_logger = logging.getLogger("chat_logger")
 
+# --- New Login Decorator ---
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'authenticated' not in session:
+            return redirect(url_for('main.login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 def get_last_logs(num_lines=200):
     """Get the last N lines from logs.txt"""
     try:
-        with open("logs.txt", "r") as f:
+        with open("logs/logs.txt", "r") as f:
             lines = f.readlines()
             return lines[-num_lines:] if len(lines) > num_lines else lines
     except FileNotFoundError:
@@ -56,7 +68,32 @@ def index():
     return render_template("index.html")
 
 
+@main_blueprint.route('/login', methods=['GET', 'POST'])
+def login():
+    if session.get('authenticated'):
+        return redirect(url_for('main.index'))
+    if request.method == 'POST':
+        token = request.form.get('token')
+        if token == current_app.config.get('ACCESS_TOKEN'):
+            session['authenticated'] = True
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('main.index'))
+        else:
+            flash('Invalid access token')
+    return render_template('login.html')
+
+
+@main_blueprint.route("/logout")
+@login_required
+def logout():
+    """Log the user out."""
+    session.clear()
+    flash('You have been logged out.')
+    return redirect(url_for('main.login'))
+
+
 @main_blueprint.route("/openai/v1/chat/completions", methods=["GET", "POST"])
+@bearer_required
 def chat_completions():
     """Handle OpenAI chat completions"""
     try:
@@ -68,6 +105,7 @@ def chat_completions():
 
 
 @main_blueprint.route("/openai/v1/models", methods=["GET"])
+@bearer_required
 def list_models():
     """Handle OpenAI models list"""
     try:
@@ -79,12 +117,14 @@ def list_models():
 
 
 @main_blueprint.route("/chat", methods=["GET"])
+@login_required
 def chat_page():
     """Render the chat page"""
     return render_template("chat.html")
 
 
 @main_blueprint.route("/chat/message", methods=["POST"])
+@login_required
 def chat_message():
     """Handle chat messages from the user"""
     try:
@@ -108,12 +148,14 @@ def chat_message():
 
 
 @main_blueprint.route("/logs", methods=["GET"])
+@login_required
 def logs_page():
     """Render the logs page"""
     return render_template("logs.html")
 
 
 @main_blueprint.route("/api/logs", methods=["GET"])
+@login_required
 def get_logs():
     """API endpoint to get log data"""
     try:
@@ -125,12 +167,14 @@ def get_logs():
 
 
 @main_blueprint.route("/chat-logs", methods=["GET"])
+@login_required
 def chat_logs_page():
     """Render the chat logs visualization page"""
     return render_template("chat_logs.html")
 
 
 @main_blueprint.route("/api/chat-logs", methods=["GET"])
+@login_required
 def get_chat_logs():
     """API endpoint to get parsed chat log data"""
     try:

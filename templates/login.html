@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Login - AI Bridge{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center h-full">
+    <div class="w-full max-w-sm p-8 space-y-6 bg-white rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold text-center text-gray-800">Enter Access Token</h2>
+        
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">
+                {% for category, message in messages %}
+                    <span class="font-medium">{{ message }}</span>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('main.login') }}{{ '?next=' + request.args.next if request.args.next else '' }}" class="space-y-6">
+            <div>
+                <label for="token" class="sr-only">Access Token</label>
+                <input id="token" name="token" type="password" required autofocus
+                       class="w-full px-3 py-2 text-gray-700 bg-gray-200 rounded-lg focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500"
+                       placeholder="Access Token">
+            </div>
+            <div>
+                <button type="submit"
+                        class="w-full px-4 py-2 font-bold text-white bg-blue-500 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Login
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

@@ -21,17 +21,24 @@
 </head>
 <body class="bg-gray-100">
     <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-6 py-3">
-            <div class="flex items-center justify-between">
+        <div class="container mx-auto px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
                 <div class="text-xl font-bold text-gray-800">
                     <a href="/">AI Bridge</a>
                 </div>
-                <div class="flex space-x-4">
-                    <a href="/" class="text-gray-600 hover:text-blue-500">Home</a>
-                    <a href="/chat" class="text-gray-600 hover:text-blue-500">Chat</a>
-                    <a href="/logs" class="text-gray-600 hover:text-blue-500">App Logs</a>
-                    <a href="/chat-logs" class="text-gray-600 hover:text-blue-500">Chat Logs</a>
-                </div>
+                <a href="/" class="text-gray-600 hover:text-blue-500">Home</a>
+                {% if session.authenticated %}
+                <a href="/chat" class="text-gray-600 hover:text-blue-500">Chat</a>
+                <a href="/logs" class="text-gray-600 hover:text-blue-500">App Logs</a>
+                <a href="/chat-logs" class="text-gray-600 hover:text-blue-500">Chat Logs</a>
+                {% endif %}
+            </div>
+            <div class="flex items-center space-x-4">
+                {% if session.authenticated %}
+                    <a href="{{ url_for('main.logout') }}" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('main.login') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">Login</a>
+                {% endif %}
             </div>
         </div>
     </nav>
