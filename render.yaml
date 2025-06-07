@@ -3,8 +3,8 @@ services:
     name: ai-bridge
     env: python
     plan: free # optional
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn --workers 4 --bind 0.0.0.0:$PORT app:create_app"
+    buildCommand: "pip install -r requirements.txt && flask db upgrade"
+    startCommand: "gunicorn --workers 4 --bind 0.0.0.0:$PORT app:app"
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.11"
