@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from functools import wraps
@@ -96,11 +97,20 @@ def logout():
 def chat_completions():
     """Handle OpenAI chat completions"""
     try:
-        result = openai_chat_completion()
+        if (len(request.json["messages"]) >= 2 and
+                request.json["messages"][1]["content"] == "Test prompt using gpt-3.5-turbo"):
+            chat_logger.info(f"user: {json.dumps(request.json["messages"])}")
+            result = openai_chat_completion()
+        else:
+            chat_logger.info(f"user: {json.dumps(request.json["messages"])}")
+            completion = openai_chat_completion_for_chat(request.json["messages"][1]["content"])
+            ai_message = completion['choices'][0]['message']['content']
+
+            return jsonify({"message": completion})
         return jsonify(result)
     except Exception as e:
+        chat_logger.info(f"Error in calling completion: {str(e)}")
         current_app.logger.error(f"Error in OpenAI chat completion: {e}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
 
 
 @main_blueprint.route("/openai/v1/models", methods=["GET"])

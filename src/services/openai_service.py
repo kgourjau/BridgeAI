@@ -34,7 +34,9 @@ def openai_chat_completion():
 
 
 def openai_chat_completion_for_chat(user_message: str):
-    """Make chat completion request to the target API"""
+    """
+    Make chat completion request to the target API and format the response to resemble OpenAI's.
+    """
     url = f"{TARGET_API_BASE_URL}/chat/completions"
     headers = {
         "Content-Type": "application/json",
@@ -47,4 +49,33 @@ def openai_chat_completion_for_chat(user_message: str):
     data = {"messages": messages, "model": "llama-3.3-70b-versatile"}
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
-    return response.json() 
+    
+    # Get the original response from the target API
+    original_response = response.json()
+
+    # Create a new, formatted response that mimics the OpenAI structure
+    formatted_response = {
+        "id": original_response.get("id"),
+        "object": "chat.completion",
+        "created": original_response.get("created"),
+        "model": original_response.get("model"),
+        "choices": original_response.get("choices"),
+        "system_fingerprint": original_response.get("system_fingerprint")
+    }
+
+    # Re-format the usage object to match OpenAI's standard
+    if "usage" in original_response and original_response["usage"]:
+        original_usage = original_response["usage"]
+        formatted_response["usage"] = {
+            "prompt_tokens": original_usage.get("prompt_tokens"),
+            "completion_tokens": original_usage.get("completion_tokens"),
+            "total_tokens": original_usage.get("total_tokens")
+        }
+    else:
+        formatted_response["usage"] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0
+        }
+        
+    return formatted_response 
