@@ -97,20 +97,26 @@ def logout():
 def chat_completions():
     """Handle OpenAI chat completions"""
     try:
-        if (len(request.json['messages']) >= 2 and
-                request.json['messages'][1]['content'] == "Test prompt using gpt-3.5-turbo"):
-            chat_logger.info(f"user: {json.dumps(request.json['messages'])}")
-            result = openai_chat_completion()
-        else:
-            chat_logger.info(f"user: {json.dumps(request.json['messages'])}")
-            completion = openai_chat_completion_for_chat(request.json['messages'][1]['content'])
-            ai_message = completion['choices'][0]['message']['content']
+        messages = request.json.get("messages")
+        if not messages:
+            return jsonify({"error": "messages is required"}), 400
 
-            return jsonify({"message": completion})
-        return jsonify(result)
+        chat_logger.info(f"user: {json.dumps(messages)}")
+
+        if len(messages) >= 2 and messages[1].get("content") == "Test prompt using gpt-3.5-turbo":
+            result = openai_chat_completion()
+            chat_logger.info(f"AI: {json.dumps(result)}")
+            return jsonify(result)
+
+        completion = openai_chat_completion_for_chat(messages)
+        ai_source = f"AI ({TARGET_API_BASE_URL}/chat/completions)"
+        chat_logger.info(f"{ai_source}: {json.dumps(completion)}")
+
+        return jsonify(completion)
     except Exception as e:
-        chat_logger.info(f"Error in calling completion: {str(e)}")
+        chat_logger.error(f"Error in calling completion: {str(e)}", exc_info=True)
         current_app.logger.error(f"Error in OpenAI chat completion: {e}", exc_info=True)
+        return jsonify({"error": "An internal error has occurred."}), 500
 
 
 @main_blueprint.route("/openai/v1/models", methods=["GET"])
@@ -144,11 +150,15 @@ def chat_message():
 
         chat_logger.info(f"user: {user_message}")
 
-        completion = openai_chat_completion_for_chat(user_message)
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": user_message},
+        ]
+        completion = openai_chat_completion_for_chat(messages)
         ai_message = completion['choices'][0]['message']['content']
 
         ai_source = f"AI ({TARGET_API_BASE_URL}/chat/completions)"
-        chat_logger.info(f"{ai_source}: {ai_message}")
+        chat_logger.info(f"{ai_source}: {json.dumps(completion)}")
 
         return jsonify({"message": ai_message})
     except Exception as e:

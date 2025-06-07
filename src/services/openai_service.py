@@ -33,7 +33,7 @@ def openai_chat_completion():
     return response.json()
 
 
-def openai_chat_completion_for_chat(user_message: str):
+def openai_chat_completion_for_chat(messages: list):
     """
     Make chat completion request to the target API and format the response to resemble OpenAI's.
     """
@@ -42,10 +42,6 @@ def openai_chat_completion_for_chat(user_message: str):
         "Content-Type": "application/json",
         "Authorization": f"Bearer {TARGET_API_KEY}",
     }
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": user_message},
-    ]
     data = {"messages": messages, "model": "llama-3.3-70b-versatile"}
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
