@@ -17,4 +17,4 @@ TARGET_API_KEY = os.getenv("TARGET_API_KEY")
 TARGET_API_BASE_URL = os.getenv("TARGET_API_BASE_URL")
 
 # Bearer token for securing API endpoints
-BEARER_TOKEN = os.getenv("BEARER")
+BEARER_TOKEN = os.getenv("BEARER_TOKEN")

@@ -1,11 +1,14 @@
 from functools import wraps
 from flask import request, jsonify, current_app
 
+from src.config import BEARER_TOKEN
+
+
 def bearer_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # The app context is now guaranteed to be available here
-        expected_token = current_app.config.get('BEARER_TOKEN')
+        expected_token = BEARER_TOKEN
 
         if not expected_token:
             # This error will now correctly report if the server config is missing
