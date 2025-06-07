@@ -5,18 +5,18 @@ import os
 from src.routes.main import main_blueprint
 
 def setup_logging():
-    # Ensure log directory exists
+    # Ensure log directory exists for chat logs
     os.makedirs("logs", exist_ok=True)
 
-    # Configure general logging
+    # Configure general logging to stream to stdout
+    # In a production environment like Render, logs should be sent to stdout/stderr
+    # to be captured by the platform's logging service.
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler("logs/logs.txt"),
-            logging.StreamHandler()
-        ]
+        handlers=[logging.StreamHandler()]
     )
+
     # Configure chat logging
     chat_logger = logging.getLogger("chat_logger")
     chat_logger.setLevel(logging.INFO)
