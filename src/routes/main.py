@@ -12,7 +12,6 @@ from src.services.openai_service import (
 from src.config import TARGET_API_BASE_URL
 
 main_blueprint = Blueprint("main", __name__)
-logger = logging.getLogger(__name__)
 chat_logger = logging.getLogger("chat_logger")
 
 # --- New Login Decorator ---
@@ -100,7 +99,7 @@ def chat_completions():
         result = openai_chat_completion()
         return jsonify(result)
     except Exception as e:
-        logger.error(f"Error in OpenAI chat completion: {e}", exc_info=True)
+        current_app.logger.error(f"Error in OpenAI chat completion: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -112,7 +111,7 @@ def list_models():
         result = openai_list_models()
         return jsonify(result)
     except Exception as e:
-        logger.error(f"Error fetching OpenAI models: {e}", exc_info=True)
+        current_app.logger.error(f"Error fetching OpenAI models: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -143,7 +142,7 @@ def chat_message():
 
         return jsonify({"message": ai_message})
     except Exception as e:
-        logger.error(f"Error handling chat message: {e}", exc_info=True)
+        current_app.logger.error(f"Error handling chat message: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -162,7 +161,7 @@ def get_logs():
         logs = get_last_logs(200)
         return jsonify({"logs": logs})
     except Exception as e:
-        logger.error(f"Error fetching logs: {e}", exc_info=True)
+        current_app.logger.error(f"Error fetching logs: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -181,5 +180,5 @@ def get_chat_logs():
         logs = parse_chat_logs()
         return jsonify({"logs": logs})
     except Exception as e:
-        logger.error(f"Error fetching chat logs: {e}", exc_info=True)
+        current_app.logger.error(f"Error fetching chat logs: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500 

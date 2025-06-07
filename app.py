@@ -4,20 +4,29 @@ import logging
 import os
 from src.routes.main import main_blueprint
 
-def setup_logging():
+def setup_logging(app):
     # Ensure log directory exists for chat logs
     os.makedirs("logs", exist_ok=True)
 
-    # Configure general logging to stream to stdout
-    # In a production environment like Render, logs should be sent to stdout/stderr
-    # to be captured by the platform's logging service.
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler()]
-    )
+    # Remove any default handlers that Flask might have added
+    app.logger.handlers.clear()
+    
+    # Integrate with Gunicorn's logger if running under Gunicorn
+    if 'gunicorn' in os.environ.get('SERVER_SOFTWARE', ''):
+        gunicorn_error_logger = logging.getLogger('gunicorn.error')
+        app.logger.handlers.extend(gunicorn_error_logger.handlers)
+        app.logger.setLevel(gunicorn_error_logger.level)
+    else:
+        # For local development, log to the console
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        handler.setFormatter(formatter)
+        app.logger.addHandler(handler)
+        app.logger.setLevel(logging.INFO)
 
-    # Configure chat logging
+    # Configure dedicated chat logging to a file
     chat_logger = logging.getLogger("chat_logger")
     chat_logger.setLevel(logging.INFO)
     chat_formatter = logging.Formatter('%(asctime)s - %(message)s')
@@ -32,7 +41,7 @@ def create_app():
 
     CORS(app)
     
-    setup_logging()
+    setup_logging(app)
     app.register_blueprint(main_blueprint)
 
     return app
