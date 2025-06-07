@@ -101,7 +101,7 @@ def chat_completions():
         if not messages:
             return jsonify({"error": "messages is required"}), 400
 
-        chat_logger.info(f"user: {json.dumps(messages)}")
+        chat_logger.info(f"user: {json.dumps(request.json)}")
 
         if len(messages) >= 2 and messages[1].get("content") == "Test prompt using gpt-3.5-turbo":
             result = openai_chat_completion()
