@@ -128,8 +128,39 @@ def chat_completions():
 
         if stream:
             chat_logger.info("AI: Streaming response initiated.")
-            streamer = openai_chat_completion_for_chat_stream(request_data)
-            return Response(stream_with_context(stream_generator(streamer)), mimetype="text/event-stream")
+            payload = request_data
+
+            payload["model"] = "llama-3.3-70b-versatile"
+
+            def generate_stream():
+                """Proxy the stream directly, yielding each chunk as it arrives."""
+                try:
+                    response = openai_chat_completion_for_chat_stream(payload)
+                    ai_source = f"AI ({TARGET_API_BASE_URL}/chat/completions)"
+                    chat_logger.info(f"{ai_source}: Streaming response initiated (proxy mode).")
+                    buffer = b""
+                    for chunk in response.iter_content(chunk_size=None):
+                        buffer = buffer + chunk
+                        index = buffer.find(b"\n\n")
+                        while index > -1:
+                            json_chunk = json.loads(buffer[6:index])
+                            json_chunk["model"] = "gpt-4o-mini"
+                            if "x_groq" in json_chunk:
+                                del json_chunk["x_groq"]
+                            new_chunk = "data: " + json.dumps(json_chunk) + "\n\n"
+                            binary_chunk = bytes(new_chunk, "UTF-8")
+                            print("chunk:", binary_chunk)
+                            buffer = buffer[index + 2:]
+                            index = buffer.find(b"\n\n")
+                            yield binary_chunk
+                        # yield chunk
+                    pass
+                except Exception as e:
+                    chat_logger.error(f"Error during stream generation: {str(e)}", exc_info=True)
+                    error_message = json.dumps({"error": {"message": "An error occurred during the stream."}})
+                    yield f"data: {error_message}\\n\\n".encode('utf-8')
+
+            return Response(stream_with_context(generate_stream()), mimetype='text/event-stream')
 
         completion = openai_chat_completion_for_chat(messages)
         ai_source = f"AI ({TARGET_API_BASE_URL}/chat/completions)"
