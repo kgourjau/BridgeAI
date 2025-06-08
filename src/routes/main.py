@@ -126,7 +126,7 @@ def chat_completions():
                 chat_logger.info(f"AI: {json.dumps(result)}")
                 return jsonify(result)
 
-        if stream:
+        if True:
             chat_logger.info("AI: Streaming response initiated.")
             payload = request_data
 
@@ -143,7 +143,11 @@ def chat_completions():
                         buffer = buffer + chunk
                         index = buffer.find(b"\n\n")
                         while index > -1:
-                            json_chunk = json.loads(buffer[6:index])
+                            line = buffer[6:index]
+                            if line.find(b"[DONE]") > -1:
+                                yield b"data: " + line + b"\n\n"
+                                break
+                            json_chunk = json.loads(line)
                             json_chunk["model"] = "gpt-4o-mini"
                             if "x_groq" in json_chunk:
                                 del json_chunk["x_groq"]
