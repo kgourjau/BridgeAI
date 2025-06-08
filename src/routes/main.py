@@ -130,7 +130,7 @@ def chat_completions():
             chat_logger.info("AI: Streaming response initiated.")
             payload = request_data
 
-            payload["model"] = "llama-3.3-70b-versatile"
+            payload["model"] = "deepseek-r1-distill-llama-70b"
 
             def generate_stream():
                 """Proxy the stream directly, yielding each chunk as it arrives."""
@@ -215,7 +215,7 @@ def chat_message():
         
         payload = {
             "messages": messages,
-            "model": "llama-3.3-70b-versatile"
+            "model": "deepseek-r1-distill-llama-70b"
         }
 
         def generate_stream():
@@ -229,7 +229,11 @@ def chat_message():
                     buffer = buffer + chunk
                     index = buffer.find(b"\n\n")
                     while index > -1:
-                        json_chunk = json.loads(buffer[6:index])
+                        line = buffer[6:index]
+                        if line.find(b"[DONE]") > -1:
+                            yield b"data: " + line + b"\n\n"
+                            break
+                        json_chunk = json.loads(line)
                         json_chunk["model"] = "gpt-4o-mini"
                         if "x_groq" in json_chunk:
                             del json_chunk["x_groq"]
