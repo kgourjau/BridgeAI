@@ -75,3 +75,49 @@ def openai_chat_completion_for_chat(messages: list):
         }
         
     return formatted_response 
+
+
+def openai_chat_completion_stream():
+    """Make OpenAI chat completion streaming request"""
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+    }
+    messages = [
+        {"role": "system", "content": "You are a test assistant."},
+        {"role": "user", "content": "Testing. Just say hi and nothing else."},
+    ]
+    data = {"messages": messages, "model": "gpt-4o-mini", "stream": True}
+    response = requests.post(url, headers=headers, json=data, stream=True)
+    response.raise_for_status()
+    return response.iter_lines()
+
+
+def openai_chat_completion_for_chat_stream(payload: dict):
+    """
+    Make a streaming chat completion request to the target API.
+    Returns the raw response object for manual stream handling.
+    """
+    url = f"{TARGET_API_BASE_URL}/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {TARGET_API_KEY}",
+    }
+
+    payload["stream"] = True
+    if "model" not in payload:
+        payload["model"] = "llama-3.3-70b-versatile"
+
+    # url = "https://api.openai.com/v1/chat/completions"
+    # headers = {
+    #     "Content-Type": "application/json",
+    #     "Authorization": f"Bearer {OPENAI_API_KEY}",
+    # }
+    # payload["model"] = "gpt-4o-mini"
+
+
+
+    response = requests.post(url, headers=headers, json=payload, stream=True)
+    response.raise_for_status()
+    return response 

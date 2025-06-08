@@ -2,15 +2,21 @@ import json
 import logging
 import re
 from functools import wraps
-from flask import Blueprint, jsonify, render_template, request, url_for, redirect, flash, session, current_app
+from pathlib import Path
+
+import requests
+from flask import Blueprint, jsonify, render_template, request, url_for, redirect, flash, session, current_app, \
+    Response, stream_with_context
 
 from src.decorators import bearer_required
 from src.services.openai_service import (
     openai_chat_completion,
     openai_list_models,
     openai_chat_completion_for_chat,
+    openai_chat_completion_stream,
+    openai_chat_completion_for_chat_stream,
 )
-from src.config import TARGET_API_BASE_URL
+from src.config import TARGET_API_BASE_URL, OPENAI_API_KEY
 
 main_blueprint = Blueprint("main", __name__)
 chat_logger = logging.getLogger("chat_logger")
@@ -97,16 +103,33 @@ def logout():
 def chat_completions():
     """Handle OpenAI chat completions"""
     try:
-        messages = request.json.get("messages")
+        request_data = request.json
+        messages = request_data.get("messages")
+        stream = request_data.get("stream", False)
+
         if not messages:
             return jsonify({"error": "messages is required"}), 400
 
-        chat_logger.info(f"user: {json.dumps(request.json)}")
+        chat_logger.info(f"user: {json.dumps(request_data)}")
+
+        def stream_generator(response_iterator):
+            for chunk in response_iterator:
+                yield chunk + b'\\n'
 
         if len(messages) >= 2 and messages[1].get("content") == "Test prompt using gpt-3.5-turbo":
-            result = openai_chat_completion()
-            chat_logger.info(f"AI: {json.dumps(result)}")
-            return jsonify(result)
+            if stream:
+                chat_logger.info("AI: Streaming response initiated for test prompt.")
+                streamer = openai_chat_completion_stream()
+                return Response(stream_with_context(stream_generator(streamer)), mimetype="text/event-stream")
+            else:
+                result = openai_chat_completion()
+                chat_logger.info(f"AI: {json.dumps(result)}")
+                return jsonify(result)
+
+        if stream:
+            chat_logger.info("AI: Streaming response initiated.")
+            streamer = openai_chat_completion_for_chat_stream(request_data)
+            return Response(stream_with_context(stream_generator(streamer)), mimetype="text/event-stream")
 
         completion = openai_chat_completion_for_chat(messages)
         ai_source = f"AI ({TARGET_API_BASE_URL}/chat/completions)"
@@ -141,26 +164,55 @@ def chat_page():
 @main_blueprint.route("/chat/message", methods=["POST"])
 @login_required
 def chat_message():
-    """Handle chat messages from the user"""
+    """Handle chat messages from the user and stream the response."""
     try:
         data = request.get_json()
-        user_message = data.get("message")
-        if not user_message:
-            return jsonify({"error": "Message is required"}), 400
+        user_input = data.get("message") or data.get("prompt")
+        if not user_input:
+            return jsonify({"error": "message or prompt is required"}), 400
 
-        chat_logger.info(f"user: {user_message}")
+        chat_logger.info(f"user: {user_input}")
 
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": user_message},
+            {"role": "user", "content": user_input},
         ]
-        completion = openai_chat_completion_for_chat(messages)
-        ai_message = completion['choices'][0]['message']['content']
+        
+        payload = {
+            "messages": messages,
+            "model": "llama-3.3-70b-versatile"
+        }
 
-        ai_source = f"AI ({TARGET_API_BASE_URL}/chat/completions)"
-        chat_logger.info(f"{ai_source}: {json.dumps(completion)}")
+        def generate_stream():
+            """Proxy the stream directly, yielding each chunk as it arrives."""
+            try:
+                response = openai_chat_completion_for_chat_stream(payload)
+                ai_source = f"AI ({TARGET_API_BASE_URL}/chat/completions)"
+                chat_logger.info(f"{ai_source}: Streaming response initiated (proxy mode).")
+                buffer = b""
+                for chunk in response.iter_content(chunk_size=None):
+                    buffer = buffer + chunk
+                    index = buffer.find(b"\n\n")
+                    while index > -1:
+                        json_chunk = json.loads(buffer[6:index])
+                        json_chunk["model"] = "gpt-4o-mini"
+                        if "x_groq" in json_chunk:
+                            del json_chunk["x_groq"]
+                        new_chunk = "data: " + json.dumps(json_chunk) + "\n\n"
+                        binary_chunk = bytes(new_chunk, "UTF-8")
+                        print("chunk:", binary_chunk)
+                        buffer = buffer[index+2:]
+                        index = buffer.find(b"\n\n")
+                        yield binary_chunk
+                    # yield chunk
+                pass
+            except Exception as e:
+                chat_logger.error(f"Error during stream generation: {str(e)}", exc_info=True)
+                error_message = json.dumps({"error": {"message": "An error occurred during the stream."}})
+                yield f"data: {error_message}\\n\\n".encode('utf-8')
 
-        return jsonify({"message": ai_message})
+        return Response(stream_with_context(generate_stream()), mimetype='text/event-stream')
+
     except Exception as e:
         current_app.logger.error(f"Error handling chat message: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
@@ -201,4 +253,4 @@ def get_chat_logs():
         return jsonify({"logs": logs})
     except Exception as e:
         current_app.logger.error(f"Error fetching chat logs: {e}", exc_info=True)
-        return jsonify({"error": str(e)}), 500 
+        return jsonify({"error": str(e)}), 500

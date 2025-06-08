@@ -12,8 +12,8 @@
             <!-- Messages -->
             <template x-for="message in messages" :key="message.id">
                 <div class="flex" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
-                    <div class="max-w-lg px-4 py-2 rounded-lg" :class="message.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'">
-                        <p x-text="message.content"></p>
+                    <div class="max-w-lg px-4 py-2 rounded-lg prose" :class="message.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'">
+                        <div x-html="message.content"></div>
                     </div>
                 </div>
             </template>
@@ -51,49 +51,100 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-    function chat() {
-        return {
-            messages: [],
-            userInput: '',
-            messageId: 0,
-            isTyping: false,
-            sendMessage() {
-                if (this.userInput.trim() === '') return;
+    var aaa;
+  function chat() {
+    return {
+      messages: [],
+      userInput: '',
+      messageId: 0,
+      isTyping: false,
 
-                this.messages.push({ id: this.messageId++, role: 'user', content: this.userInput });
-                const userMessage = this.userInput;
-                this.userInput = '';
-                this.isTyping = true;
-                
-                this.scrollToBottom();
+      async sendMessage() {
+        if (this.userInput.trim() === '') return;
 
-                fetch('/chat/message', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ message: userMessage })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    this.messages.push({ id: this.messageId++, role: 'assistant', content: data.message });
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    this.messages.push({ id: this.messageId++, role: 'assistant', content: 'Sorry, something went wrong.' });
-                })
-                .finally(() => {
-                    this.isTyping = false;
-                    this.scrollToBottom();
-                });
-            },
-            scrollToBottom() {
-                this.$nextTick(() => {
-                    this.$refs.chatbox.scrollTop = this.$refs.chatbox.scrollHeight;
-                });
+        this.messages.push({ id: this.messageId++, role: 'user', content: this.userInput });
+        const userMessage = this.userInput;
+        this.userInput = '';
+        this.isTyping = true;
+        
+        this.scrollToBottom();
+
+        try {
+            const response = await fetch('/chat/message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: userMessage })
+            });
+
+            if (!response.body) {
+                throw new Error('Response has no body');
             }
+            
+            this.isTyping = false;
+            // Push the initial empty assistant message
+            this.messages.push({ id: this.messageId++, role: 'assistant', content: '' });
+            this.scrollToBottom();
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let rawContent = ''; // Accumulates the full text for marked.parse
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) {
+                    break;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                let boundary;
+                
+                while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+                    const messageString = buffer.substring(0, boundary);
+                    buffer = buffer.substring(boundary + 2);
+                    
+                    const lines = messageString.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data:')) {
+                            const jsonString = line.substring(5).trim();
+                            if (jsonString === '[DONE]') {
+                                return; 
+                            }
+                            try {
+                                const parsed = JSON.parse(jsonString);
+                                const deltaContent = parsed.choices?.[0]?.delta?.content;
+                                if (deltaContent) {
+                                    rawContent += deltaContent;
+                                    // Get the last message from the array and update it directly
+                                    this.messages[this.messages.length - 1].content = marked.parse(rawContent);
+                                    this.scrollToBottom();
+                                }
+                            } catch (e) {
+                                console.error("Failed to parse stream JSON:", line, e);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch(error) {
+            console.error('Error:', error);
+            this.messages.push({ id: this.messageId++, role: 'assistant', content: 'Sorry, something went wrong.' });
+        } finally {
+            this.isTyping = false;
+            this.scrollToBottom();
         }
+      },
+
+      scrollToBottom() {
+        this.$nextTick(() => {
+          this.$refs.chatbox.scrollTop = this.$refs.chatbox.scrollHeight;
+        });
+      }
     }
+  }
 </script>
 {% endblock %} 
